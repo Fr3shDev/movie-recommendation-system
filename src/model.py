@@ -15,3 +15,15 @@ print(ratings.head())
 print(ratings.shape)
 print(ratings['rating'].describe())
 print(movies.head())
+
+# Keep users with at least 20 ratings and movies with at least 20 ratings
+min_user_ratings = 20
+min_movie_ratings = 20
+
+user_counts = ratings['userId'].value_counts()
+movie_counts = ratings['movieId'].value_counts()
+
+ratings = ratings[ratings['userId'].isin(user_counts[user_counts >= min_user_ratings].index)]
+ratings = ratings[ratings['movieId'].isin(movie_counts[movie_counts >= min_movie_ratings].index)]
+
+print("After filtering:", ratings.shape)
