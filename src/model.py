@@ -227,8 +227,8 @@ M_centered = user_item_train.sub(user_means_train, axis=0).fillna(0.0).values
 # Factorize to r latent factors
 r = 50
 svd = TruncatedSVD(n_components=r, random_state=42)
-U = svd.fit_transform(M_centered)           # users by r
-SigmaVT = svd.components_                   # r by items
+U = svd.fit_transform(M_centered)           
+SigmaVT = svd.components_                   
 
 # Reconstruct scores, then add user means back
 score_matrix = U @ SigmaVT                  # centered predictions
