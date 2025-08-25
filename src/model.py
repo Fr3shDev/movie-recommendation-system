@@ -154,3 +154,15 @@ def precision_at_k(user_item, user_sim_df, train_ratings, test_ratings, k_neighb
 
 p_at_10 = precision_at_k(user_item, user_sim_df, train_ratings, test_ratings, k_neighbors=40, K=10, positive_threshold=4.0)
 print("Precision@10:", round(p_at_10, 4))
+
+def show_user_history(user_id, n=10):
+    hist = (
+        train_ratings[train_ratings['userId'] == user_id]
+        .merge(movies[['movieId', 'title']], on='movieId', how='left')
+        .sort_values('rating', ascending=False)
+        .head(n)
+    )
+    return hist[['movieId', 'title', 'rating']]
+
+print(show_user_history(example_user))
+print(recommend_for_user(example_user, k_neighbors=40, top_n=10))
