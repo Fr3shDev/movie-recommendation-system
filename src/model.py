@@ -71,3 +71,55 @@ sim_users = cosine_similarity(user_item_centered.values)
 user_sim_df = pd.DataFrame(sim_users, index=all_users, columns=all_users)
 
 print("Similarity shape:", user_sim_df.shape)
+
+def recommend_for_user(target_user, k_neighbors=40, top_n=10):
+    if target_user not in user_item.index:
+        raise ValueError("User not found in training data")
+    
+    # Get the target row and similarities to all users
+    sims = user_sim_df.loc[target_user]
+
+    sims = sims.drop(target_user)
+
+    # Get top K neighbors by similarity
+    top_neighbors = sims.nlargest(k_neighbors).index
+
+    neighbor_centered = user_item_centered.loc[top_neighbors]
+
+    # Similarities vector aligned to neighbor rows
+    neighbor_sims = sims.loc[top_neighbors].to_numpy().reshape(-1, 1)
+
+    # We only want items the target user has not rated in train
+    seen_items = user_item.loc[target_user].dropna().index
+    candidate_items = [i for i in user_item.columns if i not in seen_items]
+
+    # Compute predicted scores for each candidate
+    preds = {}
+    for item in candidate_items:
+        residuals = neighbor_centered[item].to_numpy().reshape(-1, 1)
+        mask = residuals.flatten() != 0.0
+        if not np.any(mask):
+            continue
+        sims_used = neighbor_sims[mask]
+        res_used = residuals[mask]
+        denom = np.sum(np.abs(sims_used))
+        if denom == 0.0:
+            continue
+        delta = np.sum(sims_used * res_used) / denom
+        preds[item] = user_means.loc[target_user] + delta
+
+    # Top N by predicted score
+    if len(preds) == 0:
+        return pd.DataFrame(columns=["movieId", "pred_score", "title"])
+    
+    recs = (
+        pd.DataFrame([(iid, s) for iid, s in preds.items()], columns=["movieId","pred_score"])
+        .sort_values("pred_score", ascending=False)
+        .head(top_n)
+        .merge(movies[["movieId","title"]], on="movieId", how="left")
+    )
+    return recs
+
+# Example, pick a user from the test set
+example_user = int(test_ratings['userId'].sample(1, random_state=7).iloc[0])
+recommend_for_user(example_user, k_neighbors=40, top_n=10)
