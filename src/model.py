@@ -52,3 +52,13 @@ def leave_one_out_split(df, positive_threshold=4.0, seed=42):
 train_ratings, test_ratings = leave_one_out_split(ratings, positive_threshold=4.0, seed=42)
 
 print("Train size:", train_ratings.shape, "Test size:", test_ratings.shape)
+
+# Build pivot on train set only
+user_item = train_ratings.pivot_table(index='userId', columns='movieId', values='rating')
+
+# Keep quick maps
+all_users = user_item.index.to_numpy()
+all_items = user_item.columns.to_numpy()
+
+# Compute user mean ratings, used for mean centering and a safe fallback
+user_means = user_item.mean(axis=1)
