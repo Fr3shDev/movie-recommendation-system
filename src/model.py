@@ -123,3 +123,34 @@ def recommend_for_user(target_user, k_neighbors=40, top_n=10):
 # Example, pick a user from the test set
 example_user = int(test_ratings['userId'].sample(1, random_state=7).iloc[0])
 recommend_for_user(example_user, k_neighbors=40, top_n=10)
+
+def precision_at_k(user_item, user_sim_df, train_ratings, test_ratings, k_neighbors=40, K=10, positive_threshold=4.0):
+    test_pos = (
+        test_ratings[test_ratings['rating'] >= positive_threshold]
+        .groupby('userId')['movieId']
+        .apply(set)
+        .to_dict()
+    )
+
+    users = list(test_ratings['userId'].unique())
+    precisions = []
+
+    for u in users:
+        if u not in user_item.index:
+            continue
+
+        recs = recommend_for_user(u, k_neighbors=k_neighbors, top_n=K)
+        if recs.empty:
+            precisions.append(0.0)
+            continue
+
+        topk_items = set(recs['movieId'].tolist())
+        pos_items = test_pos.get(u, set())
+
+        hits = len(topk_items.intersection(pos_items))
+        precisions.append(hits / K)
+
+    return float(np.mean(precisions)) if len(precisions) > 0 else 0.0
+
+p_at_10 = precision_at_k(user_item, user_sim_df, train_ratings, test_ratings, k_neighbors=40, K=10, positive_threshold=4.0)
+print("Precision@10:", round(p_at_10, 4))
