@@ -27,3 +27,28 @@ ratings = ratings[ratings['userId'].isin(user_counts[user_counts >= min_user_rat
 ratings = ratings[ratings['movieId'].isin(movie_counts[movie_counts >= min_movie_ratings].index)]
 
 print("After filtering:", ratings.shape)
+
+# For each user, hold out 1 rating for test (preferably a positive, rating >= 4)
+
+def leave_one_out_split(df, positive_threshold=4.0, seed=42):
+    rng = np.random.default_rng(seed)
+    test_rows = []
+    keep_mask = np.ones(len(df), dtype=bool)
+
+    # group by user
+    for uid, grp in df.groupby('userId'):
+        pos_idx = grp.index[grp['rating'] >= positive_threshold].tolist()
+        if len(pos_idx) > 0:
+            chosen = rng.choice(pos_idx, size=1)[0]
+        else: 
+            chosen = rng.choice(grp.index.values, size=1)[0]
+        test_rows.append(chosen)
+        keep_mask[df.index.get_loc(chosen)] = False
+    
+    test_df = df.loc[test_rows]
+    train_df = df[keep_mask]
+    return train_df, test_df
+
+train_ratings, test_ratings = leave_one_out_split(ratings, positive_threshold=4.0, seed=42)
+
+print("Train size:", train_ratings.shape, "Test size:", test_ratings.shape)
