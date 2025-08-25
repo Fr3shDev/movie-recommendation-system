@@ -62,3 +62,12 @@ all_items = user_item.columns.to_numpy()
 
 # Compute user mean ratings, used for mean centering and a safe fallback
 user_means = user_item.mean(axis=1)
+
+# Mean center
+user_item_centered = user_item.sub(user_means, axis=0).fillna(0.0)
+
+sim_users = cosine_similarity(user_item_centered.values)
+
+user_sim_df = pd.DataFrame(sim_users, index=all_users, columns=all_users)
+
+print("Similarity shape:", user_sim_df.shape)
