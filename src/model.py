@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_score 
 from sklearn.metrics.pairwise import cosine_similarity 
+from sklearn.decomposition import TruncatedSVD
 
 ratings = pd.read_csv("data/ml-100k/u.data", sep="\t", names=["userId", "movieId", "rating", "timestamp"])
 movies = pd.read_csv("data/ml-100k/u.item", sep="|", encoding="latin-1", names=["movieId","title","release_date","video_release_date","imdb_url",
@@ -215,3 +216,34 @@ def recommend_for_user_item_based(target_user, k_neighbors=40, top_n=10):
         .merge(movies[["movieId","title"]], on="movieId", how="left")
     )
     return recs
+
+# Bonus 2) Matrix factorization with TruncatedSVD
+# Build user item matrix on train and fill missing with 0 after mean centering
+# We will center by user to reduce bias
+user_item_train = train_ratings.pivot_table(index='userId', columns='movieId', values='rating')
+user_means_train = user_item_train.mean(axis=1)
+M_centered = user_item_train.sub(user_means_train, axis=0).fillna(0.0).values
+
+# Factorize to r latent factors
+r = 50
+svd = TruncatedSVD(n_components=r, random_state=42)
+U = svd.fit_transform(M_centered)           # users by r
+SigmaVT = svd.components_                   # r by items
+
+# Reconstruct scores, then add user means back
+score_matrix = U @ SigmaVT                  # centered predictions
+score_matrix = score_matrix + user_means_train.to_numpy().reshape(-1,1)
+
+svd_scores = pd.DataFrame(score_matrix, index=user_item_train.index, columns=user_item_train.columns)
+
+def recommend_for_user_svd(user_id, top_n=10):
+    if user_id not in svd_scores.index:
+        raise ValueError("User not found in training data")
+    user_scores = svd_scores.loc[user_id]
+    seen = user_item_train.loc[user_id].dropna().index
+    candidates = user_scores.drop(index=seen).sort_values(ascending=False).head(top_n)
+    return (
+        candidates.reset_index().rename(columns={"index":"movieId", user_id:"pred"})
+        .merge(movies[["movieId","title"]], on="movieId", how="left")
+        .rename(columns={0:"pred_score"})
+    )
