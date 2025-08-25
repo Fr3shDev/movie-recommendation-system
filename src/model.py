@@ -166,3 +166,52 @@ def show_user_history(user_id, n=10):
 
 print(show_user_history(example_user))
 print(recommend_for_user(example_user, k_neighbors=40, top_n=10))
+
+# Bonus 1) Item based collaborative filtering
+item_user = train_ratings.pivot_table(index='movieId', columns='userId', values='rating')
+
+# Item mean centering
+item_means = item_user.mean(axis=1)
+item_user_centered = item_user.sub(item_means, axis=0).fillna(0.0)
+
+# Item item cosine similarity
+sim_items = cosine_similarity(item_user_centered.values)
+item_sim_df = pd.DataFrame(sim_items, index=item_user.index, columns=item_user.index)
+
+def recommend_for_user_item_based(target_user, k_neighbors=40, top_n=10):
+    if target_user not in user_item.index:
+        raise ValueError("User not found in training data")
+    
+    # Items the user has rated in train
+    user_ratings = user_item.loc[target_user].dropna()
+    seen_items = set(user_ratings.index)
+
+    scores = {}
+    for cand in item_user.index:
+        if cand in seen_items:
+            continue
+        # Similarities to items the user has been seen
+        sims = item_sim_df.loc[cand, list(seen_items)]
+        residuals = user_ratings.loc[list(seen_items)] - item_means.loc[list(seen_items)]
+
+        # select top k similar seen items to reduce noise
+        topk_idx = sims.nlargest(k_neighbors).index
+        sims_k = sims.loc[topk_idx].to_numpy()
+        res_k = residuals.loc[topk_idx].to_numpy()
+
+        denom = np.sum(np.abs(sims_k))
+        if denom == 0.0:
+            continue
+        delta = np.sum(sims_k * res_k) / denom
+        scores[cand] = item_means.loc[cand] + delta
+    
+    if len(scores) == 0:
+        return pd.DataFrame(columns=["movieId","pred_score","title"])
+    
+    recs = (
+        pd.DataFrame([(iid, s) for iid, s in scores.items()], columns=["movieId","pred_score"])
+        .sort_values("pred_score", ascending=False)
+        .head(top_n)
+        .merge(movies[["movieId","title"]], on="movieId", how="left")
+    )
+    return recs
